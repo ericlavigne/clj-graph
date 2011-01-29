@@ -1,7 +1,8 @@
 (ns clj-graph.core
   (:use clojure.contrib.combinatorics
         clojure.contrib.math
-        clojure.set))
+        clojure.set
+        clj-graph.indexed-set-of-sets))
 
 (defn random-graph
   "Generate a random graph with a given number of nodes and approximate density.
@@ -53,3 +54,42 @@
         num-possible-edges (* num-nodes (dec num-nodes))]
     (if (< num-nodes 2) 1.0 (/ (* 1.0 num-edges)
                                num-possible-edges))))
+
+(defn concatmap [f & args]
+  (apply concat (apply map f args)))
+
+(defn cliques
+  "Find all cliques in the graph, and return them as a set of sets of nodes."
+  [graph]
+  (loop [remaining-nodes (keys graph)
+         sub-cliques (indexed-create)]
+    (let [node (first remaining-nodes)
+          connections (graph node)
+          matching-sub-cliques (if (< (count connections)
+                                      (count (:set sub-cliques)))
+                                 (concatmap (fn [connection]
+                                              (get-by-index sub-cliques connection))
+                                            connections)
+                                 (filter (fn [sub-clique]
+                                           (not (empty? (intersection sub-clique
+                                                                      connections))))
+                                         (:set sub-cliques)))
+          new-sub-cliques (reduce (fn [sub-cliques match]
+                                    (let [overlap (intersection match
+                                                                connections)
+                                          new-sub-clique (conj overlap node)]
+                                      (if (= match overlap)
+                                        (indexed-add (indexed-remove sub-cliques
+                                                                     match)
+                                                     new-sub-clique)
+                                        (indexed-add sub-cliques
+                                                     new-sub-clique))))
+                                  sub-cliques
+                                  (if (empty? matching-sub-cliques)
+                                    [#{node}]
+                                    matching-sub-cliques))]
+      (if (empty? (rest remaining-nodes))
+        (set (filter (fn [clique] (> (count clique) 2))
+                     (:set new-sub-cliques)))
+        (recur (rest remaining-nodes)
+               new-sub-cliques)))))
