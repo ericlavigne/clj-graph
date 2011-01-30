@@ -1,7 +1,8 @@
 (ns clj-graph.test.core
   (:use [clj-graph.core] :reload)
   (:use [clojure.test])
-  (:use clojure.contrib.math))
+  (:use clojure.contrib.math)
+  (:import [org.joda.time DateTime]))
 
 (defn approx= [tolerance]
   (fn [& args]
@@ -46,4 +47,13 @@
              #{2 3 4}
              #{5 6 7}})
         "calculate cliques for small graph with three small cliques, two of which overlap.")))
-  
+
+(deftest test-cliques-speed
+  (doseq [density (range 0 1 0.05)]
+    (let [start (DateTime.)
+          cnt (count (cliques (random-graph {:num-nodes 25 :density density})))
+          end (DateTime.)]
+      (is (.isBefore end (.plusSeconds start 30))
+          (str "This calculation typically takes less than 5 seconds, "
+               "so consider 30+ seconds an error.")))))
+
